@@ -4,7 +4,11 @@
   "description": "Database migrations and initialization for Fermentation Data Platform",
   "main": "init-db.js",
   "scripts": {
-    "init": "node init-db.js"
+    "init": "node init-db.js",
+    "init:print": "node init-db.js --print-only",
+    "seed": "node seed-sample-data.js",
+    "seed:clean": "node seed-sample-data.js --clean",
+    "seed:many": "node seed-sample-data.js --count=10 --clean"
   },
   "keywords": [
     "supabase",
@@ -16,6 +20,7 @@
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.38.4",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3"
   }
 }
