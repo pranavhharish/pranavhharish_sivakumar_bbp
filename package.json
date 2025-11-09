@@ -1,0 +1,21 @@
+{
+  "name": "fermentation-platform-database",
+  "version": "1.0.0",
+  "description": "Database migrations and initialization for Fermentation Data Platform",
+  "main": "init-db.js",
+  "scripts": {
+    "init": "node init-db.js"
+  },
+  "keywords": [
+    "supabase",
+    "postgresql",
+    "fermentation",
+    "bioprocess"
+  ],
+  "author": "Pranavh",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.4",
+    "dotenv": "^16.3.1"
+  }
+}
