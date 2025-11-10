@@ -1,11 +1,17 @@
-# Fermentation Data Platform - Architecture Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+# Fermentation Data Platform - Architecture & Development Guide
 
 ## Project Overview
 
 The Fermentation Data Platform is a full-stack web application for uploading, storing, and visualizing fermentation run data. It enables Boston Bioprocess users to upload CSV files, parse them with custom parameter mapping, store structured data in a PostgreSQL database via Supabase, and visualize time-series parameters through interactive charts.
 
 **Tech Stack:**
-- Frontend: Next.js 16 + React 19 + TailwindCSS
+- Frontend: Next.js 16 + React 19 + TailwindCSS 4
 - Backend: Node.js + Express + TypeScript
 - Database: Supabase (PostgreSQL)
 - File Handling: Multer (backend) + Papaparse (CSV parsing)
@@ -13,749 +19,409 @@ The Fermentation Data Platform is a full-stack web application for uploading, st
 
 ---
 
-## Architecture Overview
+## Project Structure
 
-### High-Level Data Flow
+```
+.
+├── frontend/              # Next.js frontend application
+│   ├── src/
+│   │   ├── app/          # App router, layouts, pages
+│   │   ├── components/   # React components
+│   │   ├── hooks/        # Custom hooks
+│   │   ├── lib/          # Utilities (API client, CSV parser)
+│   │   ├── styles/       # TailwindCSS globals
+│   │   └── types/        # TypeScript interfaces
+│   └── package.json
+├── backend/               # Express API server
+│   ├── src/
+│   │   ├── config/       # Environment configuration
+│   │   ├── middleware/   # Express middleware
+│   │   ├── routes/       # API endpoints
+│   │   ├── services/     # Database service layer
+│   │   ├── utils/        # Helpers (CSV parsing, validation, database)
+│   │   ├── types/        # TypeScript interfaces
+│   │   └── index.ts      # Express app setup
+│   └── package.json
+├── database/              # Database schema & initialization
+│   ├── init-db.js        # SQL generation script
+│   └── package.json
+├── CLAUDE.md             # This file
+├── README.md             # Project overview and quick start
+└── .env                  # Environment variables (not committed)
+```
+
+---
+
+## Common Development Commands
+
+### Frontend (`frontend/`)
+
+```bash
+# Development server with hot reload
+npm run dev              # http://localhost:3000
+
+# Production build
+npm run build
+npm run start
+
+# Code quality
+npm run lint            # Run ESLint
+```
+
+### Backend (`backend/`)
+
+```bash
+# Development server with hot reload & auto-restart
+npm run dev              # http://localhost:3000
+
+# Production build & run
+npm run build            # Compile TypeScript
+npm run start            # Run compiled code
+
+# Code quality & testing
+npm run test             # Run tests with Vitest
+npm run test:coverage    # Test coverage report
+npm run lint             # Run ESLint
+npm run format           # Format with Prettier
+```
+
+### Database (`database/`)
+
+```bash
+# Generate SQL initialization statements
+npm run init             # Prints SQL to console for manual execution
+```
+
+### Quick Development Workflow
+
+**Terminal 1 - Start backend:**
+```bash
+cd backend
+npm install
+cp .env.example .env     # Fill in SUPABASE_URL and SUPABASE_KEY
+npm run dev
+```
+
+**Terminal 2 - Start frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs on `http://localhost:3000` and proxies API calls to the backend.
+
+---
+
+## High-Level Architecture
+
+### Data Flow
 
 ```
 CSV Upload (Frontend)
     ↓
-File Validation & Form Processing (Frontend)
+File & CSV Structure Validation (Frontend)
     ↓
-HTTP POST to /api/upload (Backend)
+HTTP POST /api/upload with FormData (Backend)
     ↓
-CSV Parsing & Filename Validation (Backend)
+Filename Parsing, CSV Parsing, Pump Mapping (Backend)
     ↓
-Database Insert (Supabase - 2 tables)
+Database Insert (2 tables: run_client, run_time_series_data)
     ↓
 Response with Run ID & Record Count
     ↓
-Display Results & Trigger History Refresh (Frontend)
+Display Results & Refresh Run History (Frontend)
     ↓
-User Selects Run from History
+User Clicks Run in History
     ↓
 GET /api/runs/:runId (Backend)
     ↓
-Transform Data to Plotly Format
+Transform Time-Series Data to Plotly Format
     ↓
-Render Interactive Chart (Frontend)
+Render Interactive Dual-Axis Chart (Frontend)
 ```
 
----
+### Frontend Architecture
 
-## 1. Frontend Structure (`.trees/frontend/src`)
+**Main State Container:** `frontend/src/app/page.tsx`
+- Manages `currentRun`, `refreshTrigger`, `isLoading`, and toasts
+- Orchestrates file upload, run selection, and data visualization
+- Uses 4-column grid layout: 1 column sidebar + 3 columns content
 
-### Directory Layout
+**Key Components:**
+- `UploadForm.tsx` - CSV file input, pump selection (Glucose|Glycerol, Base|Acid), upload with progress
+- `DataVisualization.tsx` - Plotly.js dual Y-axis chart
+- `RunHistory.tsx` - Paginated list of previous runs (50 per page)
+- `Toast.tsx` - Notification UI component
+- `useToast.ts` - Toast state management hook
 
-```
-src/
-├── app/
-│   ├── layout.tsx       # Root layout with metadata
-│   └── page.tsx         # Main home page (client component)
-├── components/
-│   ├── UploadForm.tsx   # File upload & pump selection form
-│   ├── DataVisualization.tsx  # Plotly chart component
-│   ├── RunHistory.tsx   # List of previous runs
-│   └── Toast.tsx        # Toast notification component
-├── hooks/
-│   └── useToast.ts      # Toast state management hook
-├── lib/
-│   ├── apiClient.ts     # Axios-based API client
-│   └── csvParser.ts     # Client-side CSV utilities
-├── styles/
-│   └── globals.css      # TailwindCSS styles
-└── types/
-    └── index.ts         # TypeScript interfaces
-```
+**API Integration:**
+- `lib/apiClient.ts` - Singleton Axios instance with centralized error handling
+- Methods: `uploadFile()`, `getRunData()`, `listRuns()`
+- Uses `NEXT_PUBLIC_API_URL` env variable (defaults to `http://localhost:3000`)
 
-### Key Files Analysis
+### Backend Architecture
 
-#### **src/app/page.tsx** (Main Entry Point)
-- **Type:** Client component (`'use client'`)
-- **Purpose:** Orchestrates the entire frontend application
-- **State Management:**
-  - `currentRun`: Currently selected/loaded run with time-series data
-  - `refreshTrigger`: Counter to refresh run history list
-  - `isLoading`: Loading state during data fetch
-- **Key Functions:**
-  - `handleUploadSuccess()`: Triggered after successful CSV upload
-  - `handleRunSelect()`: Called when user clicks a run in history
-  - `loadRun()`: Fetches run data and displays visualization
+**Express Middleware Stack (in `src/index.ts`):**
+1. CORS (wildcard in dev, restricted in prod)
+2. JSON body parsing (10MB limit)
+3. Request logging
+4. Routes mounting
+5. 404 and error handlers (error handler must be last)
 
-**Layout Pattern:** 
-- 4-column grid: 1 column for sidebar (RunHistory), 3 columns for main content (UploadForm + DataVisualization)
-- Uses responsive classes (`lg:col-span-1` / `lg:col-span-3`)
+**API Endpoints:**
+- `POST /api/upload` - File upload with pump mapping
+- `GET /api/runs` - List runs with pagination (query: `limit`, `offset`)
+- `GET /api/runs/:runId` - Get specific run with time-series data and Plotly traces
 
-#### **src/app/layout.tsx**
-- Root layout with Next.js metadata
-- Applies TailwindCSS base styles
-- Minimal setup, delegates to page.tsx
+**Validation Pipeline (in `src/routes/upload.ts`):**
+1. File type & size validation
+2. Pump selection validation
+3. Filename pattern validation (extract `ClientXXX` and `RXXXXXX`)
+4. CSV structure validation (required columns: Time Stamp, Parameter, Process value, Units)
+5. Data type validation (numeric fields)
+6. Database insert with batching (1000 records per batch)
 
-#### **src/lib/apiClient.ts** (API Integration)
-- **Pattern:** Singleton class with Axios instance
-- **Base URL:** Configured via `NEXT_PUBLIC_API_URL` env variable (defaults to `http://localhost:3000`)
-- **Methods:**
-  - `uploadFile(file, pump1, pump2)`: POST to `/api/upload`
-  - `getRunData(runId)`: GET from `/api/runs/:runId`
-  - `listRuns(limit, offset)`: GET from `/api/runs`
-- **Error Handling:** Catches errors and returns user-friendly messages
+**Error Handling:**
+- Structured error responses: `{ success, error, code }`
+- Error codes: `INVALID_FILE`, `MISSING_PARAMETERS`, `INVALID_FILENAME`, `INVALID_CSV_FORMAT`, `DATABASE_ERROR`, `DUPLICATE_RUN_ID`
+- Middleware: `middleware/errorHandler.ts` with `asyncHandler` wrapper for Promise rejection handling
 
-#### **src/components/UploadForm.tsx**
-- **State:**
-  - `file`: Selected File object
-  - `pump1` / `pump2`: Selected pump types
-  - `isUploading`: Upload progress flag
-  - `uploadProgress`: Progress percentage (0-100)
-- **Features:**
-  - Drag-and-drop file handling
-  - File validation (checks MIME type, size, filename format)
-  - CSV pre-parsing for validation
-  - Progress feedback to user
-
-**Pump Selections:** User can map CSV "Pump1" and "Pump2" to:
-- Pump1 → "Glucose" or "Glycerol"
-- Pump2 → "Base" or "Acid"
-
-#### **src/components/DataVisualization.tsx**
-- **Props:** `runId`, `clientName`, `data` (TimeSeriesData array)
-- **Technology:** React-Plotly.js with dual Y-axes
-- **Chart Configuration:**
-  - X-axis: Time Stamp (seconds)
-  - Y-axis (left): pH, Glucose, Glycerol, Base, Acid
-  - Y2-axis (right): Temperature
-  - Color-coded traces per parameter
-  - Interactive hover info and zoom/pan controls
-
-#### **src/components/RunHistory.tsx**
-- **Props:** `onRunSelect()` callback, `refreshTrigger` (re-fetch trigger)
-- **Features:**
-  - Lists all runs with pagination (50 per page)
-  - Displays run_id, client_name, created_at
-  - Click to load and visualize run data
-  - Auto-refreshes when `refreshTrigger` changes
-
-#### **src/hooks/useToast.ts**
-- **Purpose:** Manages toast notifications state
-- **Features:**
-  - Auto-dismiss after 5 seconds (configurable)
-  - Methods: `success()`, `error()`, `warning()`, `info()`
-  - Returns: `toasts[]`, `removeToast()`, type-specific methods
-
-#### **src/types/index.ts**
-```typescript
-TimeSeriesData: { time_stamp, parameter, process_value, units }
-RunData: { run_id, client_name, created_at }
-RunWithData: RunData + { data: TimeSeriesData[] }
-UploadResponse: { success, runId, clientName, recordsInserted, ... }
-RunsListResponse: { success, runs[], total }
-```
-
-### Frontend Patterns & Conventions
-
-1. **Client Components:** All interactive components use `'use client'` directive
-2. **API Client:** Singleton pattern with centralized error handling
-3. **State Lifting:** Main state in `page.tsx`, props passed down
-4. **Responsive Design:** TailwindCSS with mobile-first approach
-5. **Type Safety:** Full TypeScript with interfaces for all data structures
-
----
-
-## 2. Backend Structure (`.trees/backend/src`)
-
-### Directory Layout
-
-```
-src/
-├── index.ts             # Express app setup & middleware
-├── config/
-│   └── index.ts         # Environment config validation
-├── middleware/
-│   └── errorHandler.ts  # Error handling & async wrapper
-├── routes/
-│   ├── upload.ts        # POST /api/upload endpoint
-│   └── runs.ts          # GET /api/runs endpoints
-├── services/
-│   └── database.ts      # DatabaseService class
-├── utils/
-│   ├── csv-parser.ts    # CSV parsing utilities
-│   ├── db.ts            # Database operations (Supabase client)
-│   ├── validation.ts    # Input validation functions
-│   ├── validators.ts    # Additional validators
-│   ├── errors.ts        # Custom error classes
-│   └── logger.ts        # Logging utility
-└── types/
-    └── index.ts         # TypeScript interfaces
-```
-
-### Key Files Analysis
-
-#### **src/index.ts** (Express App Setup)
-**Middleware Stack:**
-1. CORS configuration (dev-only wildcard, prod-restricted)
-2. Body parsing (JSON + URL-encoded, 10MB limit)
-3. Request logging middleware (logs method, path, status, duration)
-4. Health check endpoint: `GET /health`
-5. API routes mounted at `/api/upload` and `/api/runs`
-6. Root endpoint provides API documentation
-7. 404 handler for unknown routes
-8. Error handler (must be last middleware)
-
-**Graceful Shutdown:** Listens for SIGTERM/SIGINT, closes server cleanly
-
-#### **src/config/index.ts**
-**Configuration Pattern:** Singleton with validation
-```typescript
-AppConfig {
-  supabaseUrl, supabaseKey, supabaseServiceKey,
-  nodeEnv, port, host, maxFileSize, allowedFileTypes, logLevel
-}
-```
-- **Environment Validation:** Throws error if required vars missing
-- **Defaults:** PORT=3000, HOST=localhost, MAX_FILE_SIZE=10MB
-- **Development Logging:** Logs config on startup (excludes sensitive keys)
-
-#### **src/routes/upload.ts** (POST /api/upload)
-
-**Flow:**
-1. **File Validation** → Check MIME type, size
-2. **Pump Validation** → Ensure pump1 and pump2 are provided
-3. **Filename Parsing** → Extract clientName and runId (regex: `ClientXXX_RXXXXXX_Online_Report_BostonBioprocess.csv`)
-4. **CSV Parsing** → Use PapaParse to parse CSV content
-5. **CSV Structure Validation** → Check for required columns (Time Stamp, Parameter, Process value, Units)
-6. **Data Transformation** → Convert CSV rows to TimeSeriesRecord array, apply pump mappings
-7. **Database Insert** → Call `insertRunData()` with records
-8. **Response** → Return `{ success, runId, clientName, recordsInserted }`
-
-**Error Codes:**
-- `INVALID_FILE`: File validation failed
-- `MISSING_PARAMETERS`: Missing pump selections
-- `INVALID_FILENAME`: Filename format incorrect
-- `INVALID_CSV_FORMAT`: CSV structure invalid
-- `DATABASE_ERROR` or `DUPLICATE_RUN_ID`: Insert failed
-
-#### **src/routes/runs.ts** (GET /api/runs endpoints)
-
-**GET /api/runs** (List all runs)
-- Query params: `limit` (default 50, max 100), `offset` (default 0)
-- Returns: `{ success, runs[], total, limit, offset }`
-- Pagination-friendly structure
-
-**GET /api/runs/:runId** (Get specific run)
-- Validates runId format (must match `/^R\d{6}$/`)
-- Returns run metadata + time-series data
-- Includes transformed `chartData` in Plotly format
-- Response includes all data needed for visualization
-
-#### **src/utils/csv-parser.ts**
-
-**Key Functions:**
-- `parseAndTransformCSV(csvContent, pump1, pump2)` → Transforms CSV rows
-  - Looks for header in row 2 (0-indexed)
-  - Processes data starting from row 3
-  - Maps "Pump1" → `pump1Selection`, "Pump2" → `pump2Selection`
-  - Skips invalid rows
-  
-- `transformToPlotlyFormat(records)` → Prepares data for Plotly
-  - Groups records by parameter
-  - Creates separate traces per parameter
-  - Applies color map: pH=#3B82F6, Temp=#EF4444, Pumps=#F97316, Base/Acid=#10B981
-  - Handles dual Y-axes (left for most params, right for Temperature)
-
-- `parseFilename(filename)` → Extracts metadata
-  - Pattern: `ClientXXX_RXXXXXX_Online_Report_BostonBioprocess.csv`
-  - Returns: `{ clientName, runId }`
-
-- `validateCSVStructure(csvContent)` → Validates CSV format
-  - Checks for minimum 4 rows (2 headers + 1+ data)
-  - Validates required columns present
-  - Type-checks sample data rows
-
-#### **src/utils/db.ts** (Database Operations)
-
-**Core Functions:**
-- `insertRunData(runId, clientName, records)` → Transaction-like insert
-  1. Check if runId exists (prevent duplicates)
-  2. Insert into `run_client` table
-  3. Insert into `run_time_series_data` in batches (1000 records/batch)
-  4. Rollback on error (delete run if data insert fails)
-
-- `getRunData(runId)` → Fetch run with data
-  1. Get run metadata from `run_client`
-  2. Get time-series data from `run_time_series_data`
-  3. Sort by time_stamp ascending
-  4. Return combined data structure
-
-- `listRuns(limit, offset)` → Paginated run list
-  1. Get total count
-  2. Get paginated results (ordered by created_at DESC)
-
-#### **src/services/database.ts** (DatabaseService Class)
-
-**Alternative implementation:** More structured than `db.ts`, includes:
-- `runExists()` → Check for duplicates
-- `insertRun()` → Insert with batching
-- `getRunWithData()` → Fetch run + data
-- `listRuns()` → Paginated listing
-- `deleteRun()` → Delete with cascade
-- `getRunCount()` → Count total runs
-
-**Pattern:** Singleton instance exported for global use
-
-#### **src/types/index.ts**
-
-**Key Types:**
-```typescript
-TimeSeriesDataPoint: { time_stamp, parameter, process_value, units }
-FermentationRun: { run_id, client_name, created_at? }
-FermentationRunWithData: FermentationRun + { data: TimeSeriesDataPoint[] }
-ApiSuccessResponse<T>: { success: true, data?: T, message?: string }
-ApiErrorResponse: { success: false, error, code, details? }
-AppConfig: Configuration object structure
-PumpSelection: 'Glucose' | 'Glycerol' | 'Base' | 'Acid'
-ErrorCode enum: INVALID_FILE_TYPE, DUPLICATE_RUN_ID, DATABASE_ERROR, etc.
-```
-
-#### **src/middleware/errorHandler.ts**
-
-**Error Handling Middleware:**
-- Checks if error is custom ApiError (has statusCode & code)
-- Falls back to generic 500 for unknown errors
-- Logs all errors with context
-- Returns consistent error response format
-
-**asyncHandler Wrapper:** Catches Promise rejections in route handlers
-
-#### **src/utils/validation.ts & validators.ts**
-
-**Validation Functions:**
-- `validateFile()` → Check MIME type, extension, size
-- `validatePumpSelections()` → Ensure valid pump types
-- `parseFilename()` → Extract run info or throw
-- `validateCSVStructure()` → Full CSV validation
-
-### Backend Patterns & Conventions
-
-1. **TypeScript Strict Mode:** Full type safety across codebase
-2. **Async/Await:** All database operations use async patterns
-3. **Error Handling:** Structured error responses with codes
-4. **Validation Early:** Input validated at route handler entry
-5. **Database Batching:** Large inserts split into 1000-record batches
-6. **Pagination:** Supports limit/offset for scalability
-7. **CORS Flexible:** Dev-only wildcard, prod-restricted via env vars
-
----
-
-## 3. Database Setup (`.trees/database`)
-
-### Structure
-
-```
-database/
-├── package.json
-├── init-db.js       # Initialization script
-└── .env (from root)
-```
+**Database Layer:**
+- `utils/db.ts` - Core Supabase operations
+- `services/database.ts` - Alternative structured DatabaseService class (both available)
+- Operations: insert with duplicate check, getRunData, listRuns with pagination
+- Rollback on error (deletes run metadata if data insert fails)
 
 ### Database Schema
 
-**Two Tables:**
-
-1. **run_client** (Run metadata)
-   ```sql
-   run_id VARCHAR(20) PRIMARY KEY
-   client_name VARCHAR(100) NOT NULL
-   created_at TIMESTAMP DEFAULT NOW()
-   ```
-
-2. **run_time_series_data** (Time-series data)
-   ```sql
-   id SERIAL PRIMARY KEY
-   run_id VARCHAR(20) FK → run_client(run_id) ON DELETE CASCADE
-   time_stamp FLOAT NOT NULL
-   parameter VARCHAR(50) NOT NULL
-   process_value FLOAT NOT NULL
-   units VARCHAR(20) NOT NULL
-   created_at TIMESTAMP DEFAULT NOW()
-   
-   CREATE INDEX idx_run_time_series_run_id ON run_time_series_data(run_id)
-   CREATE INDEX idx_run_time_series_parameter ON run_time_series_data(parameter)
-   ```
-
-### Initialization Process
-
-**init-db.js:**
-- Loads environment variables from root `.env`
-- Validates SUPABASE_URL and SUPABASE_KEY
-- Prints SQL statements for manual execution
-- **Why manual?** Supabase client doesn't support raw SQL execution directly
-- **How to run?** Execute SQL statements in Supabase SQL Editor dashboard
-
-**Usage:**
-```bash
-cd .trees/database
-npm install
-npm run init  # Prints SQL to console
+**Table: `run_client`** (Run metadata)
+```sql
+run_id VARCHAR(20) PRIMARY KEY
+client_name VARCHAR(100) NOT NULL
+created_at TIMESTAMP DEFAULT NOW()
 ```
+
+**Table: `run_time_series_data`** (Time-series measurements)
+```sql
+id SERIAL PRIMARY KEY
+run_id VARCHAR(20) FK → run_client(run_id) ON DELETE CASCADE
+time_stamp FLOAT NOT NULL
+parameter VARCHAR(50) NOT NULL         -- pH, Temperature, Glucose, etc.
+process_value FLOAT NOT NULL
+units VARCHAR(20) NOT NULL
+created_at TIMESTAMP DEFAULT NOW()
+
+CREATE INDEX idx_run_time_series_run_id ON run_time_series_data(run_id)
+CREATE INDEX idx_run_time_series_parameter ON run_time_series_data(parameter)
+```
+
+**Initialization:** Run `database/init-db.js` to generate SQL statements, then execute in Supabase SQL Editor manually (Supabase JS client doesn't support raw SQL execution).
 
 ---
 
-## 4. Build & Development Commands
+## Key Implementation Details
 
-### Frontend Commands (`.trees/frontend/package.json`)
+### CSV Format & Processing
 
-```json
-"dev": "next dev"              // Start dev server on http://localhost:3000
-"build": "next build"          // Production build
-"start": "next start"          // Run production build
-"lint": "next lint"            // ESLint check
-```
-
-### Backend Commands (`.trees/backend/package.json`)
-
-```json
-"dev": "NODE_ENV=development tsx watch src/index.ts"
-"build": "tsc"                 // Compile TypeScript to JavaScript
-"start": "NODE_ENV=production node dist/index.js"
-"test": "vitest"               // Run tests with Vitest
-"test:coverage": "vitest --coverage"
-"lint": "eslint src --ext .ts"
-"format": "prettier --write \"src/**/*.ts\""
-```
-
-### Database Commands (`.trees/database/package.json`)
-
-```json
-"init": "node init-db.js"      // Print SQL initialization statements
-```
-
-### Development Workflow
-
-**Local Development (Terminal 1 - Backend):**
-```bash
-cd .trees/backend
-npm install
-cp .env.example .env          # Configure SUPABASE vars
-npm run dev                   # Starts on :3000
-```
-
-**Local Development (Terminal 2 - Frontend):**
-```bash
-cd .trees/frontend
-npm install
-npm run dev                   # Starts on :3000 (Next.js auto-proxies)
-```
-
-**Testing:**
-```bash
-cd .trees/backend
-npm run test                  # Run test suite
-npm run test:coverage         # With coverage report
-```
-
----
-
-## 5. Key Architectural Patterns
-
-### API Communication Flow
-
-1. **Frontend → Backend:**
-   - Axios instance with centralized config
-   - Base URL from environment variable
-   - Automatic error translation
-   - FormData for multipart/form-data (file uploads)
-
-2. **Backend → Database:**
-   - Supabase client initialized at service level
-   - Operations wrapped in try-catch with rollback
-   - Batched inserts for performance (1000 records/batch)
-   - Pagination support via LIMIT/OFFSET
-
-### Data Validation Pipeline
-
-**CSV Upload Validation Stages:**
-1. File existence and type check (MIME type)
-2. Filename pattern validation (extract runId/clientName)
-3. CSV structure validation (required columns)
-4. Data type validation (time_stamp and process_value are numeric)
-5. Pump selection validation (allowed values only)
-
-**Each stage has specific error codes** for frontend error handling.
-
-### Error Handling Strategy
-
-**Consistent Response Format:**
-```typescript
-Success: { success: true, data?, message?, ... }
-Error: { success: false, error: string, code: string, details? }
-```
-
-**Error Codes** enable granular frontend error handling:
-- `DUPLICATE_RUN_ID` → 409 Conflict
-- `INVALID_CSV_FORMAT` → 400 Bad Request
-- `DATABASE_ERROR` → 500 Internal Server Error
-
-### State Management Architecture
-
-**Frontend State Hierarchy:**
-```
-Home (page.tsx) - main orchestrator
-├── currentRun: RunWithData | null
-├── refreshTrigger: number
-├── isLoading: boolean
-└── toasts: Toast[]
-    └── Passed to UploadForm, DataVisualization, RunHistory
-```
-
-**Backend State:**
-- Stateless Express routes
-- Database accessed via Supabase client singleton
-- Configuration loaded once at startup
-
-### Performance Considerations
-
-1. **Batch Inserts:** 1000 records per batch to avoid timeout
-2. **Pagination:** Limits default to 50, max 100 runs
-3. **Indexes:** Created on `run_id` and `parameter` for query speed
-4. **File Size:** Limited to 10MB via Multer and config
-5. **In-Memory Storage:** Multer uses memory storage (no disk I/O)
-
----
-
-## 6. Important Implementation Details
-
-### CSV Parsing Specifics
-
-**CSV Format Expected:**
-- Row 0-1: Metadata (ignored)
-- Row 2: Headers (Time Stamp, Parameter, Process value, Units)
-- Row 3+: Data rows
-
-**Parameter Transformation:**
-- "Pump1" in CSV → User-selected value (Glucose or Glycerol)
-- "Pump2" in CSV → User-selected value (Base or Acid)
-- Other parameters (pH, Temperature) → Passed through
-
-### Plotly Visualization Configuration
-
-**Dual Y-Axis Setup:**
-- **yaxis (left):** pH, Glucose, Glycerol, Base, Acid
-- **yaxis2 (right):** Temperature
-- Prevents scale mismatch when Temperature >> pH values
-
-**Interactive Features:**
-- Hover info showing parameter name, time, and value
-- Zoom/pan tools built-in
-- Download chart as PNG
-- Legend toggle to show/hide traces
-
-### Filename Parsing Rules
-
-**Required Format:**
+**Expected Filename Format:**
 ```
 ClientXXX_RXXXXXX_Online_Report_BostonBioprocess.csv
 ```
+Regex: `/^(Client[A-Z]+)_([Rr]\d{6})_Online_Report_BostonBioprocess\.csv$/`
 
-**Regex Pattern:**
-```typescript
-/^(Client[A-Z]+)_([Rr]\d{6})_Online_Report_BostonBioprocess\.csv$/
+**Expected CSV Structure:**
+```
+Row 1: Metadata (ignored)
+Row 2: Empty or ignored
+Row 3: Headers (Time Stamp,Parameter,Process value,Units)
+Row 4+: Data rows
 ```
 
-**Extraction:**
-- Capture 1 → `ClientXXX` (client name)
-- Capture 2 → `RXXXXXX` (run ID, normalized to uppercase)
+**Parameter Mapping (in `src/utils/csv-parser.ts`):**
+- "Pump1" → User-selected value (`Glucose` or `Glycerol`)
+- "Pump2" → User-selected value (`Base` or `Acid`)
+- Other parameters (pH, Temperature) → Passed through unchanged
 
----
+**Plotly Chart Configuration:**
+- Left Y-axis: pH, Glucose, Glycerol, Base, Acid
+- Right Y-axis: Temperature (prevents scale mismatch)
+- Color map: pH=#3B82F6, Temp=#EF4444, Pumps=#F97316, Base/Acid=#10B981
+- Interactive: hover, zoom, pan, download as PNG, legend toggle
 
-## 7. Environment Configuration
+### Environment Configuration
 
-### Frontend (`.trees/frontend/.env.local`)
+**Frontend (`frontend/.env.local`):**
 ```
 NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
 
-### Backend (`.trees/backend/.env`)
+**Backend (`backend/.env`):**
 ```
 SUPABASE_URL=https://...supabase.co
 SUPABASE_KEY=eyJhbGc...
+SUPABASE_SERVICE_KEY=eyJhbGc...  (optional)
 NODE_ENV=development
 PORT=3000
 HOST=localhost
+MAX_FILE_SIZE=10485760          (bytes)
+ALLOWED_FILE_TYPES=text/csv
+LOG_LEVEL=info
+FRONTEND_URL=*                   (CORS - use specific URL in prod)
 ```
 
-### Database (`.env` at root)
+**Root `.env` (for database initialization):**
 ```
 SUPABASE_URL=https://...supabase.co
 SUPABASE_KEY=eyJhbGc...
 ```
 
+### API Contracts
+
+**POST /api/upload**
+```
+Request:
+  Content-Type: multipart/form-data
+  Body: file (CSV), pump1 ("Glucose"|"Glycerol"), pump2 ("Base"|"Acid")
+
+Response:
+  { success: boolean, runId: string, clientName: string, recordsInserted: number, error?: string, code?: string }
+```
+
+**GET /api/runs?limit=50&offset=0**
+```
+Response:
+  { success: boolean, runs: [...], total: number, limit: number, offset: number }
+```
+
+**GET /api/runs/:runId**
+```
+Response:
+  { success: boolean, runId: string, clientName: string, data: [...], chartData: [...], error?: string, code?: string }
+```
+
 ---
 
-## 8. Deployment Considerations
+## Design Patterns & Conventions
 
-### Frontend Deployment (Vercel)
-- Next.js builds and deploys automatically
-- Environment variable `NEXT_PUBLIC_API_URL` must point to backend
-- Static files served from Vercel CDN
+### Frontend
+1. **Client Components**: All interactive components use `'use client'` directive
+2. **State Management**: Lifted to `page.tsx`, props passed down
+3. **API Client**: Singleton pattern with centralized error handling
+4. **Responsive Design**: TailwindCSS mobile-first
+5. **Type Safety**: Full TypeScript with exported interfaces
 
-### Backend Deployment (Options)
-- **Vercel:** Deploy as serverless functions
-- **Traditional:** Deploy to Node.js server/Docker container
-- **Docker:** See `Dockerfile` and `Dockerfile.dev` in `.trees/backend`
+### Backend
+1. **TypeScript Strict Mode**: Full type safety enforced
+2. **Async/Await**: All database operations use async patterns
+3. **Early Validation**: Input validated at route entry
+4. **Batching**: Large inserts split into 1000-record batches
+5. **Pagination**: Supports `limit` (default 50, max 100) and `offset`
+6. **Error Consistency**: Structured responses with error codes
+
+### Database
+1. **Rollback on Failure**: If data insert fails, run metadata is deleted
+2. **Indexes**: Created on `run_id` and `parameter` for query performance
+3. **Foreign Keys**: CASCADE delete from `run_client` to `run_time_series_data`
+
+---
+
+## Critical File Reference
+
+### Frontend Key Files
+- `frontend/src/app/page.tsx` - Main orchestrator with state & layout
+- `frontend/src/app/layout.tsx` - Root HTML with metadata
+- `frontend/src/components/UploadForm.tsx` - File upload & pump selection
+- `frontend/src/components/DataVisualization.tsx` - Plotly chart rendering
+- `frontend/src/components/RunHistory.tsx` - Run list with pagination
+- `frontend/src/lib/apiClient.ts` - HTTP API wrapper (Axios singleton)
+- `frontend/src/types/index.ts` - TypeScript interfaces
+
+### Backend Key Files
+- `backend/src/index.ts` - Express setup, middleware, routes
+- `backend/src/routes/upload.ts` - POST /api/upload with full validation pipeline
+- `backend/src/routes/runs.ts` - GET /api/runs endpoints
+- `backend/src/utils/csv-parser.ts` - CSV transformation and Plotly formatting
+- `backend/src/utils/db.ts` - Supabase database operations
+- `backend/src/utils/validation.ts` - Input validation functions
+- `backend/src/config/index.ts` - Environment config singleton with validation
+- `backend/src/middleware/errorHandler.ts` - Error handling & asyncHandler wrapper
+- `backend/src/types/index.ts` - TypeScript interfaces & error codes
+
+---
+
+## Performance Considerations
+
+- **Batch Inserts**: 1000 records per batch to avoid timeout on large CSVs
+- **Pagination**: Default 50 runs, max 100 (prevents loading entire history)
+- **Database Indexes**: Automatically created on `run_id` and `parameter`
+- **File Size Limit**: 10MB via Multer and config
+- **In-Memory Storage**: Multer uses memory (no disk I/O), suitable for development
+
+---
+
+## Testing
+
+Run backend tests with coverage:
+```bash
+cd backend
+npm test                # Run all tests
+npm run test:coverage   # Coverage report
+```
+
+Tests use Vitest framework.
+
+---
+
+## Deployment Notes
+
+### Frontend (Vercel)
+- Next.js builds and deploys automatically on push
+- Set `NEXT_PUBLIC_API_URL` environment variable to point to backend
+- Static assets served from CDN
+
+### Backend (Options)
+- **Vercel**: Deploy as serverless functions
+- **Traditional**: Docker container or Node.js server
+- **Docker**: See `Dockerfile` and `Dockerfile.dev`
 
 ### Database (Supabase)
-- Managed PostgreSQL instance
-- Automatic backups
-- Schema managed via SQL Editor or migrations
+- Managed PostgreSQL, automatic backups
+- Schema initialized via SQL Editor or CLI
 
 ---
 
-## 9. File Organization Summary
+## Troubleshooting
 
-### Frontend File Purposes
+**Port conflicts:** Change `PORT` in `.env` or kill process: `lsof -ti:3000 | xargs kill -9`
 
-| File | Purpose |
-|------|---------|
-| `page.tsx` | Main app orchestrator, state management |
-| `layout.tsx` | Root HTML structure, metadata |
-| `UploadForm.tsx` | File input, pump selection, upload logic |
-| `DataVisualization.tsx` | Plotly chart rendering |
-| `RunHistory.tsx` | List previous runs, selection |
-| `Toast.tsx` | Notification UI |
-| `useToast.ts` | Toast state hook |
-| `apiClient.ts` | HTTP API wrapper |
-| `csvParser.ts` | Client-side CSV validation |
+**Database connection errors:** Verify `SUPABASE_URL` and `SUPABASE_KEY` in `.env`
 
-### Backend File Purposes
+**TypeScript errors:** Run `npx tsc --noEmit` to check, or `npm run format && npm run lint -- --fix`
 
-| File | Purpose |
-|------|---------|
-| `index.ts` | Express setup, middleware, routes mounting |
-| `upload.ts` | File upload handler, CSV validation, DB insert |
-| `runs.ts` | List runs, fetch specific run |
-| `config/index.ts` | Environment validation, config singleton |
-| `db.ts` | Supabase operations (insert, get, list) |
-| `csv-parser.ts` | CSV transformation, Plotly formatting |
-| `validation.ts` | Input validation functions |
-| `errorHandler.ts` | Error handling middleware |
-| `logger.ts` | Logging utility |
-| `types/index.ts` | TypeScript interfaces |
+**CSV upload failures:** Check error code in response; verify filename format and CSV structure match expected format
+
+**Chart not rendering:** Verify data is returned from `/api/runs/:runId`, check browser console for JavaScript errors
 
 ---
 
-## 10. Critical Integration Points
+## Quick Reference: How Features Work
 
-### Frontend-Backend Contract
+### Uploading a CSV
+1. User selects file via drag-drop or input
+2. Frontend validates file (size, name format, MIME type) before upload
+3. User selects pump mappings
+4. Frontend POSTs to `/api/upload` with FormData
+5. Backend validates CSV structure and extracts metadata
+6. Backend parses CSV with pump parameter substitution
+7. Backend inserts run + time-series data in batches with rollback on error
+8. Frontend shows success toast and refreshes run history
 
-**Upload Endpoint:**
-```
-POST /api/upload
-Content-Type: multipart/form-data
-
-Body:
-- file: CSV file
-- pump1: "Glucose" | "Glycerol"
-- pump2: "Base" | "Acid"
-
-Response:
-{
-  success: boolean,
-  runId: string,
-  clientName: string,
-  recordsInserted: number,
-  error?: string,
-  code?: string
-}
-```
-
-**List Runs Endpoint:**
-```
-GET /api/runs?limit=50&offset=0
-
-Response:
-{
-  success: boolean,
-  runs: [{ run_id, client_name, created_at }],
-  total: number,
-  limit: number,
-  offset: number
-}
-```
-
-**Get Run Endpoint:**
-```
-GET /api/runs/:runId
-
-Response:
-{
-  success: boolean,
-  runId: string,
-  clientName: string,
-  createdAt: string,
-  data: [{ time_stamp, parameter, process_value, units }],
-  chartData: [plotly traces],
-  error?: string,
-  code?: string
-}
-```
-
-### Key Dependencies
-
-**Frontend:**
-- Next.js 16: Framework and routing
-- React 19: UI library
-- Axios 1.13: HTTP client
-- Plotly.js: Visualization
-- TailwindCSS 4: Styling
-- Papaparse 5: CSV parsing (validation)
-
-**Backend:**
-- Express 4.18: HTTP framework
-- Multer 1.4: File upload handling
-- Supabase JS 2.38: Database client
-- Papaparse 5.4: CSV parsing
-- TypeScript 5.3: Language
-
----
-
-## Quick Reference: How Key Features Work
-
-### Feature: Upload CSV
-1. User selects file via drag-drop or file input
-2. Frontend validates file (size, name format, MIME type)
-3. User selects pump mappings (Pump1 → Glucose/Glycerol, Pump2 → Base/Acid)
-4. Form submits via Axios POST to `/api/upload`
-5. Backend validates CSV structure
-6. Backend parses CSV, transforming column headers per pump selections
-7. Backend inserts run metadata + time-series data in batches
-8. Frontend receives run ID and record count
-9. Toast notification shows success
-10. Run history auto-refreshes
-
-### Feature: View Run
-1. User clicks run in sidebar history
-2. Frontend calls `apiClient.getRunData(runId)`
-3. Backend queries `run_client` and `run_time_series_data` tables
+### Viewing a Run
+1. User clicks run in history sidebar
+2. Frontend calls `GET /api/runs/:runId`
+3. Backend retrieves run metadata and time-series data
 4. Backend transforms data to Plotly trace format
-5. Frontend receives data and renders interactive chart
-6. User can zoom, pan, hover for details
+5. Frontend renders dual-axis interactive chart
+6. User can zoom, pan, hover for details, download as PNG
 
----
-
-## Development Tips
-
-1. **Adding new parameter:** Modify `colorMap` in `csv-parser.ts`, update validation
-2. **Changing chart layout:** Edit `transformToPlotlyFormat()` or Plotly config in component
-3. **Database schema changes:** Use Supabase SQL Editor, update types
-4. **New API endpoint:** Add route file in `/routes`, mount in `index.ts`
-5. **Error debugging:** Check error code returned in response, check backend logs
-
----
-
-## Conclusion
-
-This architecture prioritizes:
-- **Simplicity:** Single-page app with clear data flow
-- **Type Safety:** Full TypeScript throughout
-- **Scalability:** Pagination, batching, indexing
-- **User Experience:** Real-time feedback, interactive charts, intuitive UI
-- **Maintainability:** Separated concerns, documented patterns, consistent error handling
