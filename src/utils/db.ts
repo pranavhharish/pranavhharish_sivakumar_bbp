@@ -2,8 +2,12 @@
  * Database operations for fermentation data
  */
 
-import { supabase } from '../index.js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { config } from '../config/index.js';
 import { TimeSeriesRecord } from './csv-parser.js';
+
+// Initialize Supabase client
+const supabase: SupabaseClient = createClient(config.supabaseUrl, config.supabaseKey);
 
 export interface RunMetadata {
   run_id: string;

@@ -33,15 +33,15 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 /**
  * Request logging middleware
  */
-app.use((req: Request, res: Response, next) => {
+app.use((_req: Request, res: Response, next) => {
   const startTime = Date.now();
 
   res.on('finish', () => {
     const duration = Date.now() - startTime;
-    logger.info(`${req.method} ${req.path}`, {
+    logger.info(`${_req.method} ${_req.path}`, {
       status: res.statusCode,
       duration: `${duration}ms`,
-      ip: req.ip,
+      ip: _req.ip,
     });
   });
 
@@ -51,7 +51,7 @@ app.use((req: Request, res: Response, next) => {
 /**
  * Health check endpoint
  */
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -64,7 +64,7 @@ app.use('/api/runs', runsRoutes);
 /**
  * Root endpoint
  */
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
     name: 'Fermentation Data Platform - Backend API',
     version: '1.0.0',

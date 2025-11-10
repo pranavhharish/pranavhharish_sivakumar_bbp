@@ -111,7 +111,7 @@ export function groupByParameter(records: TimeSeriesRecord[]): Map<string, TimeS
 
 export function transformToPlotlyFormat(records: TimeSeriesRecord[]): any[] {
   const grouped = groupByParameter(records);
-  const traces = [];
+  const traces: any[] = [];
 
   const colorMap: Record<string, string> = {
     'pH': '#3B82F6',

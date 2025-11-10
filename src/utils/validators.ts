@@ -2,7 +2,7 @@
  * Validation utilities for file uploads and form data
  */
 
-import { ValidationResult, ErrorCode, PumpSelection } from '../types/index.js';
+import { ErrorCode, PumpSelection } from '../types/index.js';
 import { parseFilename } from './csv-parser.js';
 
 /**

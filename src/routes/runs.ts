@@ -4,9 +4,11 @@
  * GET /api/runs/:runId - Get specific run data
  */
 
-import express, { Request, Response, Router } from 'express';
+import { Request, Response, Router } from 'express';
 import { getRunData, listRuns } from '../utils/db.js';
 import { transformToPlotlyFormat } from '../utils/csv-parser.js';
+import { logger } from '../utils/logger.js';
+import { validateRunIdFormat } from '../utils/validators.js';
 
 const router = Router();
 
@@ -16,31 +18,48 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
-    const offset = parseInt(req.query.offset as string) || 0;
+    // Parse and validate pagination parameters
+    let limit = 50;
+    let offset = 0;
 
+    if (req.query.limit) {
+      const parsedLimit = parseInt(req.query.limit as string, 10);
+      if (!isNaN(parsedLimit) && parsedLimit > 0) {
+        limit = Math.min(parsedLimit, 100); // Max 100
+      }
+    }
+
+    if (req.query.offset) {
+      const parsedOffset = parseInt(req.query.offset as string, 10);
+      if (!isNaN(parsedOffset) && parsedOffset >= 0) {
+        offset = parsedOffset;
+      }
+    }
+
+    logger.debug('Listing runs', { limit, offset });
     const result = await listRuns(limit, offset);
 
     if (!result.success) {
+      logger.warn('Failed to list runs', { error: result.error });
       return res.status(500).json({
         success: false,
-        error: result.error,
+        error: result.error || 'Failed to fetch runs',
         code: 'DATABASE_ERROR',
       });
     }
 
     return res.status(200).json({
       success: true,
-      runs: result.runs,
-      total: result.total,
+      runs: result.runs || [],
+      total: result.total || 0,
       limit,
       offset,
     });
   } catch (error: any) {
-    console.error('List runs error:', error);
+    logger.error('List runs error', error);
     return res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.message || 'An unexpected error occurred',
       code: 'DATABASE_ERROR',
     });
   }
@@ -55,37 +74,49 @@ router.get('/:runId', async (req: Request, res: Response) => {
     const { runId } = req.params;
 
     // Validate run ID format
-    if (!runId || !/^R\d{6}$/.test(runId)) {
+    if (!runId || !validateRunIdFormat(runId)) {
+      logger.warn('Invalid run ID format', { runId });
       return res.status(400).json({
         success: false,
-        error: 'Invalid run ID format',
+        error: 'Invalid run ID format. Expected format: RXXXXXX (e.g., R001001)',
         code: 'INVALID_RUN_ID',
       });
     }
 
+    logger.debug('Fetching run data', { runId });
     const result = await getRunData(runId);
 
     if (!result.success) {
+      logger.warn('Run not found', { runId });
       return res.status(404).json({
         success: false,
-        error: 'Run not found',
+        error: `Run ID ${runId} not found`,
         code: result.error || 'RUN_NOT_FOUND',
       });
     }
+
+    // Transform data to Plotly format for frontend visualization
+    const timeSeriesData = result.data?.data || [];
+    const chartData = transformToPlotlyFormat(timeSeriesData);
+
+    logger.info('Run data fetched successfully', {
+      runId,
+      recordCount: timeSeriesData.length,
+    });
 
     return res.status(200).json({
       success: true,
       runId: result.data?.runId,
       clientName: result.data?.clientName,
       createdAt: result.data?.createdAt,
-      data: result.data?.data,
-      chartData: transformToPlotlyFormat(result.data?.data || []),
+      data: timeSeriesData,
+      chartData: chartData,
     });
   } catch (error: any) {
-    console.error('Get run error:', error);
+    logger.error('Get run error', error);
     return res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.message || 'An unexpected error occurred',
       code: 'DATABASE_ERROR',
     });
   }
