@@ -16,7 +16,6 @@
   "author": "Pranavh",
   "license": "MIT",
   "dependencies": {
-    "@tailwindcss/postcss": "^4.1.17",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "autoprefixer": "^10.4.21",
