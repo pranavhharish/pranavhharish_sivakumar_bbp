@@ -106,11 +106,10 @@ router.get('/:runId', async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      runId: result.data?.runId,
-      clientName: result.data?.clientName,
-      createdAt: result.data?.createdAt,
+      run_id: result.data?.run_id || result.data?.runId,
+      client_name: result.data?.client_name || result.data?.clientName,
+      created_at: result.data?.created_at || result.data?.createdAt,
       data: timeSeriesData,
-      chartData: chartData,
     });
   } catch (error: any) {
     logger.error('Get run error', error);

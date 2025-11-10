@@ -31,10 +31,17 @@ export default function Home() {
     setIsLoading(true);
     try {
       const data = await apiClient.getRunData(runId);
-      setCurrentRun(data as RunWithData);
+      // Normalize response data to match RunWithData interface
+      const normalizedData: RunWithData = {
+        run_id: data.run_id || data.runId || runId,
+        client_name: data.client_name || data.clientName || '',
+        created_at: data.created_at || data.createdAt || new Date().toISOString(),
+        data: data.data || [],
+      };
+      setCurrentRun(normalizedData);
       showSuccess(
         'Run Loaded',
-        `Successfully loaded run ${runId} with ${data.data?.length || 0} records`
+        `Successfully loaded run ${runId} with ${normalizedData.data?.length || 0} records`
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load run';
@@ -89,11 +96,11 @@ export default function Home() {
 
             {/* Visualization Section */}
             {isLoading && (
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <div className="inline-flex items-center gap-2">
-                  <div className="animate-spin">
+              <div className="bg-white rounded-lg shadow-md p-12 text-center">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="animate-spin mb-4">
                     <svg
-                      className="h-5 w-5 text-blue-600"
+                      className="h-8 w-8 text-blue-600"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
@@ -113,7 +120,7 @@ export default function Home() {
                       ></path>
                     </svg>
                   </div>
-                  <span className="text-gray-600">Loading run data...</span>
+                  <span className="text-gray-600 text-lg font-medium">Loading run data...</span>
                 </div>
               </div>
             )}
@@ -131,23 +138,21 @@ export default function Home() {
             {!currentRun && !isLoading && (
               <div className="bg-white rounded-lg shadow-md p-12 text-center">
                 <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  stroke="currentColor"
+                  className="mx-auto h-16 w-16 text-gray-300 mb-4"
                   fill="none"
-                  viewBox="0 0 48 48"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
                   <path
-                    d="M28 8H12a4 4 0 00-4 4v20a4 4 0 004 4h24a4 4 0 004-4V16z"
-                    strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                   />
                 </svg>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">
-                  No Run Selected
-                </h3>
-                <p className="mt-2 text-gray-600">
-                  Upload a CSV file or select a previous run from the history to get started.
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No run selected</h3>
+                <p className="text-gray-600 mb-6">
+                  Upload a CSV file above or select a run from the history to view its data visualization.
                 </p>
               </div>
             )}
