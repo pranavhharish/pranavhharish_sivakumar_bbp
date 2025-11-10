@@ -6,7 +6,6 @@
 
 import { Request, Response, Router } from 'express';
 import { getRunData, listRuns } from '../utils/db.js';
-import { transformToPlotlyFormat } from '../utils/csv-parser.js';
 import { logger } from '../utils/logger.js';
 import { validateRunIdFormat } from '../utils/validators.js';
 
@@ -95,9 +94,8 @@ router.get('/:runId', async (req: Request, res: Response) => {
       });
     }
 
-    // Transform data to Plotly format for frontend visualization
+    // Get time series data (frontend will transform to Plotly format)
     const timeSeriesData = result.data?.data || [];
-    const chartData = transformToPlotlyFormat(timeSeriesData);
 
     logger.info('Run data fetched successfully', {
       runId,
