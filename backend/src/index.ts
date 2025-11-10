@@ -94,50 +94,52 @@ app.use((req: Request, res: Response) => {
 app.use(errorHandler);
 
 /**
- * Start server
+ * Start server (only if not running in serverless environment)
  */
-const PORT = config.port;
-const HOST = config.host;
+if (process.env.VERCEL !== '1') {
+  const PORT = config.port;
+  const HOST = config.host;
 
-const server = app.listen(PORT, HOST, () => {
-  logger.info('Server started successfully', {
-    host: HOST,
-    port: PORT,
-    env: config.nodeEnv,
-    url: `http://${HOST}:${PORT}`,
+  const server = app.listen(PORT, HOST, () => {
+    logger.info('Server started successfully', {
+      host: HOST,
+      port: PORT,
+      env: config.nodeEnv,
+      url: `http://${HOST}:${PORT}`,
+    });
   });
-});
 
-/**
- * Graceful shutdown
- */
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
+  /**
+   * Graceful shutdown
+   */
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+      logger.info('Server closed');
+      process.exit(0);
+    });
   });
-});
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully...');
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
+  process.on('SIGINT', () => {
+    logger.info('SIGINT received, shutting down gracefully...');
+    server.close(() => {
+      logger.info('Server closed');
+      process.exit(0);
+    });
   });
-});
 
-/**
- * Unhandled error handlers
- */
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, reason);
-  process.exit(1);
-});
+  /**
+   * Unhandled error handlers
+   */
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, reason);
+    process.exit(1);
+  });
 
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-  process.exit(1);
-});
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error);
+    process.exit(1);
+  });
+}
 
 export default app;

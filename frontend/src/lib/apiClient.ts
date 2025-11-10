@@ -9,7 +9,12 @@ class ApiClient {
   private instance: AxiosInstance;
 
   constructor() {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    // In production (Vercel), use relative URLs to the same domain
+    // In development, use localhost backend
+    const isProduction = process.env.NODE_ENV === 'production';
+    const baseURL = isProduction 
+      ? '' // Use same domain (Vercel handles routing via vercel.json)
+      : 'http://localhost:3000';
 
     this.instance = axios.create({
       baseURL,
