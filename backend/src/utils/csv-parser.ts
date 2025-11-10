@@ -37,7 +37,7 @@ export function parseAndTransformCSV(
 ): TimeSeriesRecord[] {
   const results = Papa.parse(csvContent, {
     header: false,
-    skipEmptyLines: true,
+    skipEmptyLines: false,
     dynamicTyping: false,
   });
 
