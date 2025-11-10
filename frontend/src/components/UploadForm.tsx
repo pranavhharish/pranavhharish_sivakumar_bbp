@@ -113,7 +113,7 @@ export function UploadForm({ onUploadSuccess }: UploadFormProps) {
         <div
           onDrop={handleFileDrop}
           onDragOver={handleDragOver}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors"
+          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary hover:bg-blue-50 transition-colors"
         >
           <div className="mb-4">
             <svg
@@ -151,7 +151,7 @@ export function UploadForm({ onUploadSuccess }: UploadFormProps) {
                     fileInputRef.current.value = '';
                   }
                 }}
-                className="mt-3 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                className="mt-3 text-primary hover:text-blue-800 font-medium text-sm"
               >
                 Change File
               </button>
@@ -166,7 +166,7 @@ export function UploadForm({ onUploadSuccess }: UploadFormProps) {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-blue-600 hover:text-blue-800 font-medium"
+                  className="text-primary hover:text-blue-800 font-medium"
                 >
                   browse
                 </button>
@@ -198,7 +198,7 @@ export function UploadForm({ onUploadSuccess }: UploadFormProps) {
               value={pump1}
               onChange={(e) => setPump1(e.target.value)}
               disabled={isUploading}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">Select parameter</option>
               <option value="Glucose">Glucose</option>
@@ -215,7 +215,7 @@ export function UploadForm({ onUploadSuccess }: UploadFormProps) {
               value={pump2}
               onChange={(e) => setPump2(e.target.value)}
               disabled={isUploading}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">Select parameter</option>
               <option value="Base">Base</option>
@@ -235,7 +235,7 @@ export function UploadForm({ onUploadSuccess }: UploadFormProps) {
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                className="bg-leaf h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
@@ -246,7 +246,7 @@ export function UploadForm({ onUploadSuccess }: UploadFormProps) {
         <button
           type="submit"
           disabled={!isFormValid || isUploading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          className="w-full bg-leaf hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors"
         >
           {isUploading ? 'Uploading...' : 'Upload and Process'}
         </button>

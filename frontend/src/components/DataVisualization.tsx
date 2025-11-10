@@ -104,7 +104,7 @@ export function DataVisualization({
             onClick={() => setShowTable(false)}
             className={`px-4 py-2 rounded ${
               !showTable
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -114,7 +114,7 @@ export function DataVisualization({
             onClick={() => setShowTable(true)}
             className={`px-4 py-2 rounded ${
               showTable
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -122,7 +122,7 @@ export function DataVisualization({
           </button>
           <button
             onClick={() => downloadChartAsImage(runId, clientName)}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            className="px-4 py-2 bg-leaf text-white rounded hover:bg-green-600"
           >
             Export PNG
           </button>
@@ -157,7 +157,19 @@ export function DataVisualization({
                   },
                   margin: { r: 120, t: 80, b: 60, l: 80 },
                 } as any}
-                config={{ responsive: true, displayModeBar: true, displaylogo: false }}
+                config={{ 
+                  responsive: true, 
+                  displayModeBar: true, 
+                  displaylogo: false,
+                  toImageButtonOptions: {
+                    format: 'png',
+                    filename: `fermentation_run_${runId}_${clientName}`,
+                    height: 700,
+                    width: 1400,
+                    scale: 2
+                  },
+                  modeBarButtonsToAdd: ['toImage'] as any
+                }}
                 style={{ width: '100%', height: '500px' }}
               />
             </div>
@@ -218,36 +230,63 @@ export function DataVisualization({
   );
 }
 
-function downloadChartAsImage(runId: string, clientName: string) {
+async function downloadChartAsImage(runId: string, clientName: string) {
   try {
-    // Access the Plotly chart element from the DOM
-    const plotElement = document.querySelector('[data-plotly-div]') as any;
-
-    if (!plotElement || !plotElement.data) {
+    // Find the plotly div
+    const plotDiv = document.querySelector('.js-plotly-plot') as any;
+    
+    if (!plotDiv) {
       console.error('Chart element not found');
+      alert('Chart not found. Please wait for the chart to load.');
       return;
     }
 
-    // Use Plotly's built-in download feature
+    // Try to use Plotly's built-in toImage function
     const Plotly = (window as any).Plotly;
-    if (Plotly && Plotly.downloadImage) {
-      Plotly.downloadImage(plotElement, {
-        format: 'png',
-        width: 1200,
-        height: 600,
-        filename: `fermentation_run_${runId}_${clientName}`,
-      });
-    } else {
-      // Fallback: use HTML2Canvas if Plotly download is not available
-      const canvas = plotElement.querySelector('canvas');
-      if (canvas) {
+    if (Plotly && Plotly.toImage) {
+      try {
+        const imgData = await Plotly.toImage(plotDiv, {
+          format: 'png',
+          width: 1400,
+          height: 700,
+        });
+        
+        // Create download link
         const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
+        link.href = imgData;
         link.download = `fermentation_run_${runId}_${clientName}.png`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        return;
+      } catch (plotlyError) {
+        console.warn('Plotly toImage failed, trying fallback:', plotlyError);
       }
     }
+
+    // Fallback: Find the canvas element directly
+    const canvas = plotDiv.querySelector('canvas.main-svg');
+    if (!canvas) {
+      console.error('Canvas element not found');
+      alert('Unable to export chart. Please try again.');
+      return;
+    }
+
+    // Convert canvas to blob and download
+    canvas.toBlob((blob: Blob | null) => {
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `fermentation_run_${runId}_${clientName}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    }, 'image/png');
   } catch (error) {
     console.error('Failed to download chart:', error);
+    alert('Failed to export chart. Please check the console for details.');
   }
 }

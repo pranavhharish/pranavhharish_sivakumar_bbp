@@ -8,10 +8,10 @@ interface ToastComponentProps {
 }
 
 const toastStyles: Record<string, string> = {
-  success: 'bg-green-100 text-green-800 border-l-4 border-green-500',
+  success: 'bg-green-100 text-green-800 border-l-4 border-leaf',
   error: 'bg-red-100 text-red-800 border-l-4 border-red-500',
   warning: 'bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500',
-  info: 'bg-blue-100 text-blue-800 border-l-4 border-blue-500',
+  info: 'bg-blue-100 text-blue-800 border-l-4 border-primary',
 };
 
 export function ToastComponent({ toast, onRemove }: ToastComponentProps) {

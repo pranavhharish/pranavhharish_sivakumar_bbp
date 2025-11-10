@@ -21,94 +21,10 @@ export function parseFilename(filename: string): { clientName: string; runId: st
   };
 }
 
-/**
- * Validate CSV structure and data types
- */
-export function validateCSVStructure(data: any[]): {
-  isValid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-
-  if (!data || data.length === 0) {
-    errors.push('CSV file is empty');
-    return { isValid: false, errors };
-  }
-
-  if (data.length < 1) {
-    errors.push('CSV must contain at least one data row');
-    return { isValid: false, errors };
-  }
-
-  // Check first row has required columns
-  const firstRow = data[0];
-  const requiredColumns = ['Time Stamp', 'Parameter', 'Process value', 'Units'];
-  const hasAllColumns = requiredColumns.every(col => col in firstRow);
-
-  if (!hasAllColumns) {
-    errors.push(
-      `Missing required columns. Expected: ${requiredColumns.join(', ')}`
-    );
-    return { isValid: false, errors };
-  }
-
-  // Validate data types in each row
-  data.forEach((row, index) => {
-    if (!row['Time Stamp'] || isNaN(parseFloat(row['Time Stamp']))) {
-      errors.push(`Row ${index + 1}: Invalid Time Stamp value`);
-    }
-    if (!row['Process value'] || isNaN(parseFloat(row['Process value']))) {
-      errors.push(`Row ${index + 1}: Invalid Process value`);
-    }
-    if (!row['Parameter'] || typeof row['Parameter'] !== 'string') {
-      errors.push(`Row ${index + 1}: Invalid Parameter value`);
-    }
-    if (!row['Units'] || typeof row['Units'] !== 'string') {
-      errors.push(`Row ${index + 1}: Invalid Units value`);
-    }
-  });
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
-}
-
-/**
- * Transform CSV data by replacing pump parameters with user selections
- */
-export function transformCSVData(
-  csvData: any[],
-  pump1Selection: string,
-  pump2Selection: string
-): TimeSeriesData[] {
-  return csvData.map(row => ({
-    time_stamp: parseFloat(row['Time Stamp']),
-    parameter: replacePumpNames(row['Parameter'], pump1Selection, pump2Selection),
-    process_value: parseFloat(row['Process value']),
-    units: row['Units'],
-  }));
-}
-
-/**
- * Replace Pump1 and Pump2 with actual parameter names
- */
-function replacePumpNames(
-  parameter: string,
-  pump1Selection: string,
-  pump2Selection: string
-): string {
-  if (parameter === 'Pump1') {
-    return pump1Selection;
-  }
-  if (parameter === 'Pump2') {
-    return pump2Selection;
-  }
-  return parameter;
-}
 
 /**
  * Parse CSV file and return structured data
+ * Uses manual header detection to avoid PapaParse duplicate header warnings
  */
 export function parseCSVFile(
   file: File,
@@ -117,10 +33,9 @@ export function parseCSVFile(
 ): Promise<ParsedCSVData> {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
+      header: false,
+      skipEmptyLines: false,
       dynamicTyping: false,
-      transformHeader: (h) => h.trim(),
       complete: (results) => {
         try {
           // Extract client name and run ID from filename
@@ -130,19 +45,69 @@ export function parseCSVFile(
             return;
           }
 
-          // Validate CSV structure
-          const validation = validateCSVStructure(results.data);
-          if (!validation.isValid) {
-            reject(new Error(`CSV validation failed: ${validation.errors.join(', ')}`));
+          const rows = results.data as any[];
+          
+          // Header is at row 3 (index 2) in the CSV format
+          if (rows.length < 4) {
+            reject(new Error('CSV file must contain header and at least one data row'));
             return;
           }
 
-          // Transform CSV data
-          const transformedData = transformCSVData(
-            results.data,
-            pump1Selection,
-            pump2Selection
-          );
+          const headerRow = rows[2];
+          if (!headerRow) {
+            reject(new Error('CSV file missing header row'));
+            return;
+          }
+
+          // Find column indexes
+          const columnIndexes = {
+            timeStamp: headerRow.indexOf('Time Stamp'),
+            parameter: headerRow.indexOf('Parameter'),
+            processValue: headerRow.indexOf('Process value'),
+            units: headerRow.indexOf('Units'),
+          };
+
+          if (
+            columnIndexes.timeStamp === -1 ||
+            columnIndexes.parameter === -1 ||
+            columnIndexes.processValue === -1 ||
+            columnIndexes.units === -1
+          ) {
+            reject(new Error('CSV must contain columns: Time Stamp, Parameter, Process value, Units'));
+            return;
+          }
+
+          // Parse data rows (starting from row 4, index 3)
+          const transformedData: TimeSeriesData[] = [];
+          for (let i = 3; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length === 0) continue;
+
+            const timeStamp = parseFloat(row[columnIndexes.timeStamp]);
+            let parameter = String(row[columnIndexes.parameter]).trim();
+            const processValue = parseFloat(row[columnIndexes.processValue]);
+            const units = String(row[columnIndexes.units]).trim();
+
+            if (isNaN(timeStamp) || isNaN(processValue) || !parameter || !units) {
+              continue;
+            }
+
+            // Replace pump names
+            if (parameter === 'Pump1') parameter = pump1Selection;
+            else if (parameter === 'Pump2') parameter = pump2Selection;
+
+            transformedData.push({
+              time_stamp: timeStamp,
+              parameter,
+              process_value: processValue,
+              units,
+            });
+          }
+
+          if (transformedData.length === 0) {
+            reject(new Error('No valid data rows found in CSV'));
+            return;
+          }
 
           resolve({
             clientName: parsed.clientName,

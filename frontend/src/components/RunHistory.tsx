@@ -63,14 +63,14 @@ export function RunHistory({ onRunSelect, refreshTrigger }: RunHistoryProps) {
             placeholder="Search runs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
           />
 
           {/* Refresh Button */}
           <button
             onClick={fetchRuns}
             disabled={isLoading}
-            className="w-full px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 text-sm font-medium"
+            className="w-full px-3 py-2 bg-leaf text-white rounded hover:bg-green-600 disabled:opacity-50 text-sm font-medium"
           >
             {isLoading ? 'Loading...' : 'Refresh'}
           </button>
@@ -99,7 +99,7 @@ export function RunHistory({ onRunSelect, refreshTrigger }: RunHistoryProps) {
               <button
                 key={run.run_id}
                 onClick={() => onRunSelect?.(run)}
-                className="w-full text-left p-3 rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                className="w-full text-left p-3 rounded border border-gray-200 hover:border-primary hover:bg-blue-50 transition-colors"
               >
                 <p className="font-semibold text-gray-900 text-sm">{run.run_id}</p>
                 <p className="text-gray-600 text-xs">{run.client_name}</p>

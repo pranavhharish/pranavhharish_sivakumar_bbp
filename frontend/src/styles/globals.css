@@ -50,7 +50,7 @@ body {
 .toast.success {
   background-color: #d1fae5;
   color: #065f46;
-  border-left: 4px solid #10b981;
+  border-left: 4px solid #4CAF50;
 }
 
 .toast.error {
@@ -68,5 +68,5 @@ body {
 .toast.info {
   background-color: #dbeafe;
   color: #0c2340;
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid #2874B5;
 }

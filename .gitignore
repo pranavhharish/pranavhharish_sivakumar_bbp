@@ -1,7 +1,10 @@
-# Environment variables
+# Environment variables (git-ignored - secrets are safe)
 .env
 .env.local
 .env.*.local
+
+# Only commit .env.example (template for configuration)
+!.env.example
 
 # Node modules
 node_modules/

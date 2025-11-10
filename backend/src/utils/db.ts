@@ -108,12 +108,14 @@ export async function getRunData(
       };
     }
 
-    // Get time-series data
+    // Get time-series data (fetch all records by setting high limit)
+    // Supabase default limit is 1000, so we need to explicitly set a higher limit
     const { data: timeSeriesData, error: dataError } = await supabase
       .from('run_time_series_data')
       .select('*')
       .eq('run_id', runId)
-      .order('time_stamp', { ascending: true });
+      .order('time_stamp', { ascending: true })
+      .limit(1000000); // Set very high limit to get all data
 
     if (dataError) {
       throw new Error(`Failed to fetch data: ${dataError.message}`);

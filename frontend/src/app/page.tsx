@@ -54,21 +54,15 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-leaf shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-3">
-            <svg
-              className="h-10 w-10 text-blue-600"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
-            </svg>
+            
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Fermentation Data Platform
+              <h1 className="text-3xl font-bold text-white">
+                Boston Bioprocess: Fermentation Data Platform
               </h1>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-100 text-sm">
                 Upload, store, and visualize fermentation run data
               </p>
             </div>
@@ -100,7 +94,7 @@ export default function Home() {
                 <div className="flex flex-col items-center justify-center">
                   <div className="animate-spin mb-4">
                     <svg
-                      className="h-8 w-8 text-blue-600"
+                      className="h-8 w-8 text-primary"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
