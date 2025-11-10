@@ -6,17 +6,13 @@
   "author": "Pranavh",
   "license": "MIT",
   "scripts": {
-    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../database && npm install && cd ..",
-    "dev": "echo 'Start backend: cd backend && npm run dev' && echo 'Start frontend: cd frontend && npm run dev'",
-    "build:all": "cd backend && npm run build && cd ../frontend && npm run build && cd ..",
+    "install-all": "cd backend && npm install && cd ../frontend && npm install && cd ../database && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:all": "cd backend && npm run build && cd ../frontend && npm run build",
     "test:backend": "cd backend && npm test",
     "lint:all": "cd backend && npm run lint && cd ../frontend && npm run lint"
   },
-  "workspaces": [
-    "backend",
-    "frontend",
-    "database"
-  ],
   "keywords": [
     "fermentation",
     "bioprocess",

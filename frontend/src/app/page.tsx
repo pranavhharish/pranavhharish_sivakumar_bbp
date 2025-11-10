@@ -33,9 +33,9 @@ export default function Home() {
       const data = await apiClient.getRunData(runId);
       // Normalize response data to match RunWithData interface
       const normalizedData: RunWithData = {
-        run_id: data.run_id || data.runId || runId,
-        client_name: data.client_name || data.clientName || '',
-        created_at: data.created_at || data.createdAt || new Date().toISOString(),
+        run_id: data.run_id || runId,
+        client_name: data.client_name || '',
+        created_at: data.created_at || new Date().toISOString(),
         data: data.data || [],
       };
       setCurrentRun(normalizedData);
