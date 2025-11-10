@@ -5,18 +5,6 @@
   "installCommand": "npm run install-all",
   "framework": "nextjs",
   "outputDirectory": "frontend/.next",
-  "env": [
-    "SUPABASE_URL",
-    "SUPABASE_KEY",
-    "NODE_ENV",
-    "PORT",
-    "HOST",
-    "NEXT_PUBLIC_API_URL",
-    "FRONTEND_URL",
-    "LOG_LEVEL",
-    "MAX_FILE_SIZE",
-    "ALLOWED_FILE_TYPES"
-  ],
   "builds": [
     {
       "src": "frontend/package.json",
